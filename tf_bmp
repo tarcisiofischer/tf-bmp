@@ -81,32 +81,38 @@ struct PixelArray {
         , m_height(height)
     {}
 
-    [[nodiscard]] uint32_t width() const
+    explicit PixelArray(uint32_t width, uint32_t height)
+        : m_rawData(width * height)
+        , m_width(width)
+        , m_height(height)
+    {}
+
+    [[nodiscard]] uint32_t width() const { return m_width; }
+    [[nodiscard]] uint32_t height() const { return m_height; }
+    [[nodiscard]] uint32_t size() const { return m_width * m_height; }
+
+    [[nodiscard]] pixel_t const& operator[](int32_t const r, int32_t const c) const
     {
-        return m_width;
+        return m_rawData[_index(r, c)];
     }
 
-    [[nodiscard]] uint32_t height() const
+    [[nodiscard]] pixel_t& operator[](int32_t const r, int32_t const c)
     {
-        return m_height;
-    }
-
-    [[nodiscard]] uint32_t size() const
-    {
-        return m_width * m_height;
-    }
-
-    [[nodiscard]] pixel_t const& operator[](size_t const r, size_t const c) const
-    {
-        return m_rawData[r * m_width + c];
-    }
-
-    [[nodiscard]] pixel_t& operator[](size_t const r, size_t const c)
-    {
-        return m_rawData[r * m_width + c];
+        return m_rawData[_index(r, c)];
     }
 
 private:
+    [[nodiscard]] size_t _index(int32_t r, int32_t c) const {
+        if (r < 0 || r >= static_cast<int>(m_height)) {
+            throw std::out_of_range{"Pixel row out of range"};
+        }
+        if (c < 0 || c >= static_cast<int>(m_width)) {
+            throw std::out_of_range{"Pixel column out of range"};
+        }
+
+        return static_cast<size_t>(r) * m_width + static_cast<size_t>(c);
+    }
+
     std::vector<pixel_t> m_rawData;
     uint32_t m_width;
     uint32_t m_height;
@@ -133,9 +139,9 @@ namespace _detail {
         };
 
         auto n_padding_bytes = pa.width() % 4;
-        for (uint32_t i = 0; i < pa.height(); ++i) {
-            for (uint32_t j = 0; j < pa.width(); ++j) {
-                auto raw_pixel = pa[pa.height() - 1 - i, j];
+        for (int32_t i = 0; i < static_cast<int32_t>(pa.height()); ++i) {
+            for (int32_t j = 0; j < static_cast<int32_t>(pa.width()); ++j) {
+                auto raw_pixel = pa[static_cast<int32_t>(pa.height()) - 1 - i, j];
                 write24(raw_pixel);
             }
             ofstream.write("\0\0\0\0", n_padding_bytes);
