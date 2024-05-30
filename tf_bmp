@@ -101,16 +101,41 @@ struct PixelArray {
         return m_rawData[_index(r, c)];
     }
 
+    struct CircularView {
+        explicit CircularView(PixelArray& pa) : paRef(pa) {}
+
+        [[nodiscard]] pixel_t const& operator[](int32_t r, int32_t c) const
+        {
+            return paRef.m_rawData[_index(r, c)];
+        }
+
+        [[nodiscard]] pixel_t& operator[](int32_t r, int32_t c)
+        {
+            return paRef.m_rawData[_index(r, c)];
+        }
+
+    private:
+        [[nodiscard]] int32_t _index(int32_t r, int32_t c) const {
+            r %= static_cast<int32_t>(paRef.m_height);
+            c %= static_cast<int32_t>(paRef.m_width);
+            if (r < 0) r += paRef.m_height;
+            if (c < 0) c += paRef.m_width;
+            return r * static_cast<int32_t>(paRef.m_width) + c;
+        }
+
+        PixelArray& paRef;
+    };
+
 private:
-    [[nodiscard]] size_t _index(int32_t r, int32_t c) const {
-        if (r < 0 || r >= static_cast<int>(m_height)) {
+    [[nodiscard]] int32_t _index(int32_t r, int32_t c) const {
+        if (r < 0 || r >= static_cast<int32_t>(m_height)) {
             throw std::out_of_range{"Pixel row out of range"};
         }
-        if (c < 0 || c >= static_cast<int>(m_width)) {
+        if (c < 0 || c >= static_cast<int32_t>(m_width)) {
             throw std::out_of_range{"Pixel column out of range"};
         }
 
-        return static_cast<size_t>(r) * m_width + static_cast<size_t>(c);
+        return r * static_cast<int32_t>(m_width) + c;
     }
 
     std::vector<pixel_t> m_rawData;
