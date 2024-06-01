@@ -33,6 +33,7 @@ SOFTWARE.
 #include <expected>
 #include <fstream>
 #include <ostream>
+#include <variant>
 
 namespace tf::BMP {
 
@@ -143,10 +144,6 @@ private:
     uint32_t m_height;
 };
 
-enum class save_error {
-    file_already_exists
-};
-
 namespace _detail {
     void writePixelArrayBMP(std::ofstream &ofstream, PixelArray<BPP::_1bit> const& pa)
     { /* TODO */ }
@@ -176,6 +173,10 @@ namespace _detail {
     void writePixelArrayBMP(std::ofstream &ofstream, PixelArray<BPP::_32bits> const& pa)
     { /* TODO */ }
 }
+
+enum class save_error {
+    file_already_exists
+};
 
 template<BPP BitsPerPixel>
 std::expected<void, save_error> save(
@@ -225,6 +226,88 @@ std::expected<void, save_error> save(
     ofstream.close();
 
     return {};
+}
+
+
+namespace _detail {
+    template<BPP BitsPerPixel>
+    PixelArray<BitsPerPixel> loadPixelArrayBMP(uint32_t width, uint32_t height, std::ifstream &ifstream);
+
+    template<>
+    PixelArray<BPP::_24bits> loadPixelArrayBMP<BPP::_24bits>(uint32_t width, uint32_t height, std::ifstream &ifstream)
+    {
+        auto read24 = [&ifstream]() {
+            auto data = uint32_t{0};
+            ifstream.read(reinterpret_cast<char*>(&data), 3);
+            return data;
+        };
+
+        auto pa = PixelArray<BPP::_24bits>{width, height};
+        auto n_padding_bytes = width % 4;
+        for (int32_t i = 0; i < static_cast<int32_t>(height); ++i) {
+            for (int32_t j = 0; j < static_cast<int32_t>(width); ++j) {
+                pa[static_cast<int32_t>(height) - 1 - i, j] = read24();
+            }
+            // Ignore padding bytes
+            ifstream.seekg(n_padding_bytes, std::ios_base::cur);
+        }
+        return pa;
+    }
+}
+
+enum class load_error {
+    file_not_found,
+    invalid_bmp_file,
+    file_format_unknown,
+};
+
+// Note: This looks like nonsense, but just experimenting...
+std::expected<std::variant<
+    PixelArray<BPP::_1bit>,
+    PixelArray<BPP::_2bits>,
+    PixelArray<BPP::_4bits>,
+    PixelArray<BPP::_8bits>,
+    PixelArray<BPP::_16bits>,
+    PixelArray<BPP::_24bits>,
+    PixelArray<BPP::_32bits>
+>, load_error> load(std::filesystem::path const& infile)
+{
+    if (!std::filesystem::exists(infile)) {
+        return std::unexpected{load_error::file_not_found};
+    }
+
+    auto ifstream = std::ifstream(infile.string(), std::ios::binary);
+    auto read16 = [&ifstream]() {
+        auto data = uint16_t{0};
+        ifstream.read(reinterpret_cast<char*>(&data), sizeof(uint16_t));
+        return data;
+    };
+    auto read32 = [&ifstream]() {
+        auto data = uint32_t{0};
+        ifstream.read(reinterpret_cast<char*>(&data), sizeof(uint32_t));
+        return data;
+    };
+
+    // Bitmap file header
+    if (read16() != 0x4D'42) {
+        return std::unexpected{load_error::invalid_bmp_file};
+    }
+    ifstream.seekg(0x12); // Jump to the width of the bitmap in pixels
+    auto width = read32();
+    auto height = read32();
+    ifstream.seekg(0x1C); // Jump to the number of bits per pixel (BPP)
+    auto nbits = read16();
+
+    ifstream.seekg(0x36); // Jump to the start of pixel array
+
+    switch (nbits) {
+        case 24:
+            auto pa = _detail::loadPixelArrayBMP<BPP::_24bits>(width, height, ifstream);
+            ifstream.close();
+            return pa;
+    }
+
+    return std::unexpected{load_error::file_format_unknown};
 }
 
 }

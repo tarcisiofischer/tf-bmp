@@ -19,34 +19,47 @@ int main()
     using namespace tf::BMP;
     using PixelArray24b = PixelArray<BPP::_24bits>;
 
-    auto pa = PixelArray24b{
-        3, 5,
-        {
-            0x00'00'00, 0xCA'FE'00, 0x00'FF'00,
-            0xFF'00'FF, 0xFF'FF'FF, 0xCA'FE'00,
-            0xAB'CD'EF, 0xCA'FE'00, 0xCA'FE'00,
-            0xFF'00'FF, 0x00'FF'00, 0xCA'FE'00,
-            0xFF'00'00, 0xCA'FE'00, 0xCC'CC'CC,
-        }
-    };
-
-    assert((pa[1, 1] == 0xFF'FF'FF));
-    pa[1, 1] = 0x0F'F0'0F;
-    assert((pa[1, 1] == 0x0F'F0'0F));
-
-    assert(throws<std::out_of_range>([&]() { (void) pa[0, -1]; }));
-    assert(throws<std::out_of_range>([&]() { (void) pa[-1, 0]; }));
-    assert(throws<std::out_of_range>([&]() { (void) pa[5, 0]; }));
-    assert(throws<std::out_of_range>([&]() { (void) pa[0, 3]; }));
-
     auto tmpFile = std::filesystem::temp_directory_path() / "out.bmp";
     if (std::filesystem::exists(tmpFile)) {
         std::filesystem::remove(tmpFile);
     }
-    auto res = tf::BMP::save(pa, tmpFile);
-    assert(res.has_value());
-    res = tf::BMP::save(pa, tmpFile);
-    assert(res.error() == tf::BMP::save_error::file_already_exists);
 
+    {
+        auto pa = PixelArray24b{
+            3, 5,
+            {
+                0x00'00'00, 0xCA'FE'00, 0x00'FF'00,
+                0xFF'00'FF, 0xFF'FF'FF, 0xCA'FE'00,
+                0xAB'CD'EF, 0xCA'FE'00, 0xCA'FE'00,
+                0xFF'00'FF, 0x00'FF'00, 0xCA'FE'00,
+                0xFF'00'00, 0xCA'FE'00, 0xCC'CC'CC,
+            }
+        };
+
+        assert((pa[1, 1] == 0xFF'FF'FF));
+        pa[1, 1] = 0x0F'F0'0F;
+        assert((pa[1, 1] == 0x0F'F0'0F));
+
+        assert(throws<std::out_of_range>([&]() { (void) pa[0, -1]; }));
+        assert(throws<std::out_of_range>([&]() { (void) pa[-1, 0]; }));
+        assert(throws<std::out_of_range>([&]() { (void) pa[5, 0]; }));
+        assert(throws<std::out_of_range>([&]() { (void) pa[0, 3]; }));
+
+        auto res = tf::BMP::save(pa, tmpFile);
+        assert(res.has_value());
+        res = tf::BMP::save(pa, tmpFile);
+        assert(res.error() == tf::BMP::save_error::file_already_exists);
+    }
+
+    {
+        auto res = tf::BMP::load(tmpFile);
+        assert(res.has_value());
+        assert(std::holds_alternative<PixelArray24b>(res.value()));
+
+        auto pa = std::get<PixelArray24b>(res.value());
+        assert((pa[0, 0] == 0x00'00'00));
+        assert((pa[0, 1] == 0xCA'FE'00));
+        assert((pa[1, 0] == 0xFF'00'FF));
+    }
     return 0;
 }
