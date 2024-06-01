@@ -127,6 +127,31 @@ struct PixelArray {
         PixelArray& paRef;
     };
 
+    struct ExtendedView {
+        explicit ExtendedView(PixelArray& pa) : paRef(pa) {}
+
+        [[nodiscard]] pixel_t const& operator[](int32_t r, int32_t c) const
+        {
+            return paRef.m_rawData[_index(r, c)];
+        }
+
+        [[nodiscard]] pixel_t& operator[](int32_t r, int32_t c)
+        {
+            return paRef.m_rawData[_index(r, c)];
+        }
+
+    private:
+        [[nodiscard]] int32_t _index(int32_t r, int32_t c) const {
+            if (r < 0) r = 0;
+            if (c < 0) c = 0;
+            if (r >= static_cast<int32_t>(paRef.m_height)) r = paRef.m_height - 1;
+            if (c >= static_cast<int32_t>(paRef.m_width)) c = paRef.m_width - 1;
+            return r * static_cast<int32_t>(paRef.m_width) + c;
+        }
+
+        PixelArray& paRef;
+    };
+
 private:
     [[nodiscard]] int32_t _index(int32_t r, int32_t c) const {
         if (r < 0 || r >= static_cast<int32_t>(m_height)) {
